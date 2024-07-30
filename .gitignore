@@ -5,5 +5,4 @@ sources/
 *.pdf
 *.docx
 *.jpg
-*.ipynb
 *.DS_Store
