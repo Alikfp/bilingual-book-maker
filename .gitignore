@@ -1,0 +1,9 @@
+audio/
+publications/
+sources/
+*.mp3
+*.pdf
+*.docx
+*.jpg
+*.ipynb
+*.DS_Store

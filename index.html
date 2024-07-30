@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>French Sentence Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            text-align: center;
+            padding: 50px;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            margin: 20px;
+        }
+        .controls input, .controls button {
+            font-size: 16px;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .icon-button {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .icon-button:hover {
+            color: #007bff;
+        }
+        #audioPlayer {
+            margin-top: 20px;
+        }
+        #warning {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>À la recherche du temps perdu</h1>
+    <h3>French Sentence Player</h3>
+    <div class="controls">
+        <button class="icon-button" onclick="changeSentence(-1)" title="Previous">&#9664;</button>
+        <label for="sentenceNumber">Sentence number:</label>
+        <input type="number" id="sentenceNumber" min="1" max="60" value="1" onchange="playAudio()">
+        <button class="icon-button" onclick="changeSentence(1)" title="Next">&#9654;</button>
+    </div>
+    <div id="warning"></div>
+    <audio id="audioPlayer" controls>
+        <source id="audioSource" src="">
+    </audio>
+
+    <script>
+        function playAudio() {
+            var sentenceNumber = parseInt(document.getElementById('sentenceNumber').value);
+            var audioSource = document.getElementById('audioSource');
+            var audioPlayer = document.getElementById('audioPlayer');
+            var warning = document.getElementById('warning');
+
+            // Check if the sentence number is within the valid range
+            if (sentenceNumber < 1 || sentenceNumber > 60) {
+                warning.textContent = "Sentence number must be between 1 and 60.";
+                audioSource.src = '';  // Clear the audio source
+                audioPlayer.pause();
+            } else {
+                warning.textContent = '';  // Clear any warning message
+                audioSource.src = 'audio/sentence_' + sentenceNumber + '.mp3';
+                audioPlayer.load();  // Load the new audio file
+                audioPlayer.play();  // Play the audio
+            }
+        }
+
+        function changeSentence(change) {
+            var sentenceInput = document.getElementById('sentenceNumber');
+            var newNumber = parseInt(sentenceInput.value) + change;
+
+            // Ensure sentence number is within the valid range
+            if (newNumber < 1) newNumber = 1;
+            if (newNumber > 60) newNumber = 60;
+
+            sentenceInput.value = newNumber;
+            playAudio();
+        }
+
+        // Initialize by playing the first sentence
+        playAudio();
+    </script>
+</body>
+</html>
