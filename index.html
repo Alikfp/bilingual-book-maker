@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            background-color: #aaa9a9;
             text-align: center;
             padding: 50px;
         }
@@ -33,7 +33,10 @@
         .icon-button:hover {
             color: #007bff;
         }
-        #audioPlayer {
+        #audioPlayerContainer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-top: 20px;
         }
         #warning {
@@ -43,8 +46,7 @@
     </style>
 </head>
 <body>
-    <h1>À la recherche du temps perdu</h1>
-    <h3>French Sentence Player</h3>
+    <h1>French Sentence Player</h1>
     <div class="controls">
         <button class="icon-button" onclick="changeSentence(-1)" title="Previous">&#9664;</button>
         <label for="sentenceNumber">Sentence number:</label>
@@ -52,9 +54,12 @@
         <button class="icon-button" onclick="changeSentence(1)" title="Next">&#9654;</button>
     </div>
     <div id="warning"></div>
-    <audio id="audioPlayer" controls>
-        <source id="audioSource" src="">
-    </audio>
+    <div id="audioPlayerContainer">
+        <audio id="audioPlayer" controls>
+            <source id="audioSource" src="">
+        </audio>
+        <button class="icon-button" onclick="repeatAudio()" title="Repeat">&#x21bb;</button>
+    </div>
 
     <script>
         function playAudio() {
@@ -86,6 +91,12 @@
 
             sentenceInput.value = newNumber;
             playAudio();
+        }
+
+        function repeatAudio() {
+            var audioPlayer = document.getElementById('audioPlayer');
+            audioPlayer.currentTime = 0;  // Reset the audio to the beginning
+            audioPlayer.play();  // Play the audio
         }
 
         // Initialize by playing the first sentence
