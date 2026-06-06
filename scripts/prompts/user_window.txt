@@ -1,0 +1,10 @@
+Position: sentences {startId}–{endId} of {totalSentences} ({percent}% through book)
+Chapter / section: {chapter}
+
+Previously translated (for terminology consistency):
+{priorTranslations}
+
+{sentenceBlock}
+
+Return JSON: {{"translations": [{{"id": <number>, "translation": "<english>"}}, ...]}}
+Include one entry per [TRANSLATE] sentence only.

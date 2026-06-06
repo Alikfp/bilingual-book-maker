@@ -1,8 +1,15 @@
 audio/
 publications/
 sources/
+legacy/**
+!legacy/README.md
 *.mp3
 *.pdf
 *.docx
 *.jpg
+*.png
 *.DS_Store
+.env
+.venv/
+books/*/audio/
+sources/**/.prepare_state.json
