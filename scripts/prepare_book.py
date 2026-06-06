@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import re
-import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -34,26 +33,51 @@ def load_dotenv() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def read_epub_text(source: Path) -> str:
+    try:
+        import ebooklib
+        from ebooklib import epub
+        from bs4 import BeautifulSoup
+    except ImportError as exc:
+        raise SystemExit("Install epub support: pip install ebooklib beautifulsoup4") from exc
+
+    book = epub.read_epub(str(source))
+    parts: list[str] = []
+    seen: set[str] = set()
+
+    def append_document(item) -> None:
+        item_id = item.get_id()
+        if item_id in seen:
+            return
+        seen.add(item_id)
+        soup = BeautifulSoup(item.get_content(), "html.parser")
+        text = soup.get_text(separator="\n")
+        if text.strip():
+            parts.append(text)
+
+    # Spine order matches reading order; get_items() is manifest order (often wrong).
+    for item_id, linear in book.spine:
+        if linear == "no":
+            continue
+        item = book.get_item_with_id(item_id)
+        if item is None or item.get_type() != ebooklib.ITEM_DOCUMENT:
+            continue
+        append_document(item)
+
+    if not parts:
+        for item in book.get_items():
+            if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                append_document(item)
+
+    return "\n\n".join(parts)
+
+
 def read_text(source: Path) -> str:
     suffix = source.suffix.lower()
     if suffix == ".txt":
         return source.read_text(encoding="utf-8")
     if suffix == ".epub":
-        try:
-            import ebooklib
-            from ebooklib import epub
-            from bs4 import BeautifulSoup
-        except ImportError as exc:
-            raise SystemExit("Install epub support: pip install ebooklib beautifulsoup4") from exc
-        book = epub.read_epub(str(source))
-        parts = []
-        for item in book.get_items():
-            if item.get_type() == ebooklib.ITEM_DOCUMENT:
-                soup = BeautifulSoup(item.get_content(), "html.parser")
-                text = soup.get_text(separator="\n")
-                if text.strip():
-                    parts.append(text)
-        return "\n\n".join(parts)
+        return read_epub_text(source)
     raise SystemExit(f"Unsupported format: {suffix} (use .txt or .epub)")
 
 
@@ -255,6 +279,11 @@ def translate_window(
     return translations
 
 
+def resolve_slug(source_dir: Path) -> str:
+    """Book id / output folder: always the parent directory name of the source file."""
+    return re.sub(r"[^a-z0-9-]", "-", source_dir.name.lower()).strip("-")
+
+
 def update_catalog(slug: str) -> None:
     catalog_path = ROOT / "books" / "catalog.json"
     catalog_path.parent.mkdir(parents=True, exist_ok=True)
@@ -302,16 +331,27 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Prepare a bilingual book via LLM translation")
     parser.add_argument("source", type=Path, help="Path to book.txt or book.epub")
-    parser.add_argument("--slug", help="Book id / folder name (default: source parent dir name)")
     parser.add_argument("--title")
     parser.add_argument("--author")
     parser.add_argument("--language", default=None)
     parser.add_argument("--translation-language", default=None)
     parser.add_argument("--chapter", default=None)
     parser.add_argument("--window-size", type=int, default=15)
-    parser.add_argument("--context", type=int, default=3, help="Context sentences before/after window")
-    parser.add_argument("--from-id", type=int, default=1, dest="from_id")
-    parser.add_argument("--to-id", type=int, default=None, dest="to_id")
+    parser.add_argument("--context", type=int, default=5, help="Context sentences before/after window")
+    parser.add_argument("--from-id", type=int, default=1, dest="from_id", help="First sentence id to translate")
+    parser.add_argument(
+        "--to-id",
+        type=int,
+        default=None,
+        dest="to_id",
+        help="Last sentence id to translate (inclusive). Ignored if --limit is set.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Max sentences to translate in this run (from --from-id). E.g. --limit 30 for the first batch.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Split only, no LLM calls")
     parser.add_argument("--model", default=os.environ.get("MODEL", "gpt-4o-mini"))
     args = parser.parse_args()
@@ -321,7 +361,8 @@ def main() -> None:
         raise SystemExit(f"Source not found: {source}")
 
     source_dir = source.parent
-    slug = args.slug or re.sub(r"[^a-z0-9-]", "-", source_dir.name.lower()).strip("-")
+    slug = resolve_slug(source_dir)
+
     manifest = load_manifest(source_dir, args)
 
     text = read_text(source)
@@ -334,11 +375,24 @@ def main() -> None:
         state = json.loads(state_path.read_text(encoding="utf-8"))
         translations = {int(k): v for k, v in state.get("translations", {}).items()}
 
-    from_idx = max(0, args.from_id - 1)
-    to_idx = len(sentences) if args.to_id is None else min(args.to_id, len(sentences))
+    if args.from_id < 1 or args.from_id > len(sentences):
+        raise SystemExit(f"--from-id must be between 1 and {len(sentences)}")
 
-    print(f"Book: {manifest['title']} ({len(sentences)} sentences)")
-    print(f"Translating sentences {from_idx + 1}–{to_idx}")
+    from_idx = args.from_id - 1
+    if args.limit is not None:
+        if args.limit < 1:
+            raise SystemExit("--limit must be at least 1")
+        to_idx = min(from_idx + args.limit, len(sentences))
+    elif args.to_id is not None:
+        if args.to_id < args.from_id:
+            raise SystemExit("--to-id must be >= --from-id")
+        to_idx = min(args.to_id, len(sentences))
+    else:
+        to_idx = len(sentences)
+
+    end_id = sentences[to_idx - 1]["id"] if to_idx > from_idx else args.from_id
+    print(f"Book: {manifest['title']} ({len(sentences)} sentences total)")
+    print(f"This run: translate ids {args.from_id}–{end_id} ({to_idx - from_idx} sentences)")
 
     if args.dry_run:
         for s in sentences[from_idx:to_idx][:5]:
@@ -377,6 +431,8 @@ def main() -> None:
 
     out = write_book_json(slug, manifest, sentences, translations)
     print(f"Wrote {out}")
+    print(f"Catalog: books/catalog.json (slug {slug!r})")
+    print(f"Next: python scripts/generate_audio.py books/{slug}/ --to-id {end_id}")
 
 
 if __name__ == "__main__":
