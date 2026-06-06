@@ -49,7 +49,7 @@ Progress is saved automatically in the browser.
 
 ```
 sources/my-book/
-  book.txt          ← original text (.txt or .epub)
+  book.epub         ← or book.txt — original text
   manifest.json     ← metadata for the LLM (see below)
 ```
 
@@ -97,16 +97,29 @@ Works with any OpenAI-compatible API (`OPENAI_BASE_URL` optional).
 
 ```bash
 # Check sentence splitting (free, no API calls)
-python scripts/prepare_book.py sources/my-book/book.txt --dry-run
+python scripts/prepare_book.py sources/my-book/book.epub --dry-run
 
-# Translate the full book
-python scripts/prepare_book.py sources/my-book/book.txt --slug my-book
+# First batch only — translate 30 sentences, then test in the app
+python scripts/prepare_book.py sources/my-book/book.epub --limit 30
+
+# Continue next batch (resumes from saved state)
+python scripts/prepare_book.py sources/my-book/book.epub --from-id 31 --limit 30
+
+# Translate everything remaining (from id 1, or pick up after batches)
+python scripts/prepare_book.py sources/my-book/book.epub
 
 # Fix a bad stretch only
-python scripts/prepare_book.py sources/my-book/book.txt --from-id 40 --to-id 60
+python scripts/prepare_book.py sources/my-book/book.epub --from-id 40 --to-id 60
 ```
 
-Output lands in `books/my-book/book.json`. Translation progress is saved in `sources/my-book/.prepare_state.json` — safe to stop and resume.
+| Flag | Meaning |
+|------|---------|
+| `--limit 30` | Translate at most 30 sentences starting at `--from-id` (default 1) |
+| `--from-id 31 --limit 30` | Sentences 31–60 (batch 2) |
+| `--to-id 60` | Translate ids 1–60 inclusive (alternative to `--limit`) |
+| `--dry-run` | Split EPUB/TXT and print sample sentences, no API calls |
+
+Output always lands in `books/{folder}/book.json` where `{folder}` is the parent directory of your source file (e.g. `sources/le-petit-prince/book.epub` → `books/le-petit-prince/`). Progress is saved in `sources/{folder}/.prepare_state.json` — safe to stop and resume.
 
 **Estimate cost before translating:**
 
@@ -143,7 +156,12 @@ edge-tts --list-voices | grep fr-FR
 python scripts/generate_audio.py books/my-book/ --backend edge --voice fr-FR-DeniseNeural
 ```
 
-Creates `books/my-book/audio/sentence_1.mp3`, etc.
+Creates `books/my-book/audio/sentence_1.mp3`, etc. Match your translation batch:
+
+```bash
+# Audio for the first 30 sentences only
+python scripts/generate_audio.py books/my-book/ --to-id 30
+```
 
 #### TTS backends compared
 
@@ -208,19 +226,12 @@ legacy/                     Old experiments (not used by the app)
 
 ---
 
-## Read from anywhere (iPad over the internet)
+## Read from anywhere (iPhone / iPad over the internet)
 
-Manual prep on your Mac, then deploy so you don't need same Wi‑Fi:
+1. **[Test locally first](DEPLOY.md#part-1-test-on-iphone-locally)** — same Wi‑Fi, `http://<mac-ip>:8080/web/`
+2. **[Deploy on AWS Lightsail](DEPLOY.md#part-2-deploy-on-aws-lightsail)** — step-by-step with nginx
 
-- **[DEPLOY.md](DEPLOY.md)** — Cloudflare Tunnel (easiest: books stay on Mac, public URL) or static hosting (Cloudflare Pages / VPS)
-
-Quick tunnel test:
-
-```bash
-python3 -m http.server 8080
-cloudflared tunnel --url http://localhost:8080
-# Open https://….trycloudflare.com/web/ on iPad
-```
+Full guide: **[DEPLOY.md](DEPLOY.md)**
 
 ---
 
