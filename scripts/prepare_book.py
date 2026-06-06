@@ -11,7 +11,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+import book_common as bc
+
+ROOT = bc.ROOT
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 # Abbreviations that should not end a sentence (French).
@@ -20,17 +22,7 @@ FR_ABBREV = re.compile(
     re.IGNORECASE,
 )
 
-# Load environment variables from .env file
-def load_dotenv() -> None:
-    env_path = ROOT / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+load_dotenv = bc.load_dotenv
 
 
 def read_epub_text(source: Path) -> str:
@@ -279,21 +271,7 @@ def translate_window(
     return translations
 
 
-def resolve_slug(source_dir: Path) -> str:
-    """Book id / output folder: always the parent directory name of the source file."""
-    return re.sub(r"[^a-z0-9-]", "-", source_dir.name.lower()).strip("-")
-
-
-def update_catalog(slug: str) -> None:
-    catalog_path = ROOT / "books" / "catalog.json"
-    catalog_path.parent.mkdir(parents=True, exist_ok=True)
-    catalog = {"books": []}
-    if catalog_path.exists():
-        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-    books = catalog.setdefault("books", [])
-    if slug not in books:
-        books.append(slug)
-        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+resolve_slug = bc.resolve_slug
 
 
 def write_book_json(slug: str, manifest: dict, sentences: list[dict], translations: dict[int, str]) -> Path:
@@ -322,8 +300,94 @@ def write_book_json(slug: str, manifest: dict, sentences: list[dict], translatio
 
     out_path = book_dir / "book.json"
     out_path.write_text(json.dumps(book, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    update_catalog(slug)
+    bc.update_catalog_entry(slug)
     return out_path
+
+
+def run_translation(
+    slug: str,
+    *,
+    src_dir: Path | None = None,
+    from_id: int | None = None,
+    to_id: int | None = None,
+    limit: int | None = None,
+    re_split: bool = False,
+    dry_run: bool = False,
+    window_size: int = 15,
+    context: int = 5,
+    model: str | None = None,
+) -> dict:
+    """Translate a batch (or all) sentences for a book slug. Returns run summary."""
+    load_dotenv()
+
+    src_dir = src_dir or bc.source_dir(slug)
+    source = bc.find_source_file(src_dir)
+    if source is None:
+        raise SystemExit(f"No source file in {src_dir} (expected book.epub or book.txt)")
+
+    manifest = bc.load_manifest_dict(src_dir)
+    sentences = bc.load_sentences_cache(src_dir, source, re_split=re_split)
+    translations = bc.load_translations(src_dir)
+
+    total = len(sentences)
+    start_id = from_id or bc.next_untranslated_id(translations, total) or 1
+    if start_id < 1 or start_id > total:
+        return {"slug": slug, "translated": 0, "from_id": start_id, "to_id": start_id, "complete": True}
+
+    from_idx = start_id - 1
+    if limit is not None:
+        to_idx = min(from_idx + limit, total)
+    elif to_id is not None:
+        to_idx = min(to_id, total)
+    else:
+        to_idx = total
+
+    end_id = sentences[to_idx - 1]["id"] if to_idx > from_idx else start_id
+    print(f"Book: {manifest['title']} ({total} sentences total)")
+    print(f"This run: translate ids {start_id}–{end_id} ({to_idx - from_idx} sentences)")
+
+    if dry_run:
+        for s in sentences[from_idx:to_idx][:5]:
+            print(f"  [{s['id']}] {s['original'][:80]}…")
+        print("  …")
+        return {"slug": slug, "translated": 0, "from_id": start_id, "to_id": end_id, "dry_run": True}
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise SystemExit("Set OPENAI_API_KEY in .env or environment")
+
+    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    model = model or os.environ.get("MODEL", "gpt-4o-mini")
+
+    idx = from_idx
+    while idx < to_idx:
+        end = min(idx + window_size, to_idx)
+        print(f"  Window {sentences[idx]['id']}–{sentences[end - 1]['id']} …", flush=True)
+        translations = translate_window(
+            manifest,
+            sentences,
+            idx,
+            end,
+            translations,
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+            context_before=context,
+            context_after=context,
+        )
+        bc.save_translations(src_dir, translations)
+        idx = end
+
+    out = write_book_json(slug, manifest, sentences, translations)
+    print(f"Wrote {out}")
+    return {
+        "slug": slug,
+        "translated": to_idx - from_idx,
+        "from_id": start_id,
+        "to_id": end_id,
+        "complete": end_id >= total,
+        "book_path": out,
+    }
 
 
 def main() -> None:
@@ -353,6 +417,7 @@ def main() -> None:
         help="Max sentences to translate in this run (from --from-id). E.g. --limit 30 for the first batch.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Split only, no LLM calls")
+    parser.add_argument("--re-split", action="store_true", help="Ignore sentence cache and re-split source")
     parser.add_argument("--model", default=os.environ.get("MODEL", "gpt-4o-mini"))
     args = parser.parse_args()
 
@@ -363,76 +428,26 @@ def main() -> None:
     source_dir = source.parent
     slug = resolve_slug(source_dir)
 
-    manifest = load_manifest(source_dir, args)
+    if args.title or args.author or args.language or args.translation_language or args.chapter:
+        load_manifest(source_dir, args)
 
-    text = read_text(source)
-    raw_sentences = split_sentences(text)
-    sentences = [{"id": i + 1, "original": s} for i, s in enumerate(raw_sentences)]
-
-    state_path = source_dir / ".prepare_state.json"
-    translations: dict[int, str] = {}
-    if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-        translations = {int(k): v for k, v in state.get("translations", {}).items()}
-
-    if args.from_id < 1 or args.from_id > len(sentences):
-        raise SystemExit(f"--from-id must be between 1 and {len(sentences)}")
-
-    from_idx = args.from_id - 1
-    if args.limit is not None:
-        if args.limit < 1:
-            raise SystemExit("--limit must be at least 1")
-        to_idx = min(from_idx + args.limit, len(sentences))
-    elif args.to_id is not None:
-        if args.to_id < args.from_id:
-            raise SystemExit("--to-id must be >= --from-id")
-        to_idx = min(args.to_id, len(sentences))
-    else:
-        to_idx = len(sentences)
-
-    end_id = sentences[to_idx - 1]["id"] if to_idx > from_idx else args.from_id
-    print(f"Book: {manifest['title']} ({len(sentences)} sentences total)")
-    print(f"This run: translate ids {args.from_id}–{end_id} ({to_idx - from_idx} sentences)")
-
-    if args.dry_run:
-        for s in sentences[from_idx:to_idx][:5]:
-            print(f"  [{s['id']}] {s['original'][:80]}…")
-        print("  …")
+    result = run_translation(
+        slug,
+        src_dir=source_dir,
+        from_id=args.from_id,
+        to_id=args.to_id,
+        limit=args.limit,
+        re_split=args.re_split,
+        dry_run=args.dry_run,
+        window_size=args.window_size,
+        context=args.context,
+        model=args.model,
+    )
+    if result.get("dry_run"):
         return
-
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise SystemExit("Set OPENAI_API_KEY in .env or environment")
-
-    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    window = args.window_size
-
-    idx = from_idx
-    while idx < to_idx:
-        end = min(idx + window, to_idx)
-        print(f"  Window {sentences[idx]['id']}–{sentences[end - 1]['id']} …", flush=True)
-        translations = translate_window(
-            manifest,
-            sentences,
-            idx,
-            end,
-            translations,
-            model=args.model,
-            base_url=base_url,
-            api_key=api_key,
-            context_before=args.context,
-            context_after=args.context,
-        )
-        state_path.write_text(
-            json.dumps({"translations": translations}, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        idx = end
-
-    out = write_book_json(slug, manifest, sentences, translations)
-    print(f"Wrote {out}")
-    print(f"Catalog: books/catalog.json (slug {slug!r})")
-    print(f"Next: python scripts/generate_audio.py books/{slug}/ --to-id {end_id}")
+    if result.get("translated", 0) > 0:
+        print(f"Catalog: books/catalog.json (slug {slug!r})")
+        print(f"Next: python scripts/generate_audio.py books/{slug}/ --to-id {result['to_id']}")
 
 
 if __name__ == "__main__":

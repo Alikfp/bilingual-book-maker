@@ -17,6 +17,7 @@ __pycache__/
 *.pyo
 books/*/audio/
 **/.prepare_state.json
+**/.sentences.json
 books/**/manifest.json
 
 *.pem

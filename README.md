@@ -9,7 +9,7 @@ Read books in a foreign language **one sentence at a time** — with audio, an E
 ```
 Source text (TXT/EPUB)
         ↓
-  prepare_book.py        ← LLM translates sentence-by-sentence
+  book.py continue       ← translate batch + generate audio
         ↓
   book.json + audio      ← neural TTS reads each sentence aloud
         ↓
@@ -43,17 +43,28 @@ Progress is saved automatically in the browser.
 
 ---
 
-## Add a new book
+## Book workflow
 
-### 1. Create a source folder
+One routine for adding and extending books. Run from the project root with your venv active.
 
+### 1. One-time setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # set OPENAI_API_KEY
 ```
-sources/my-book/
-  book.epub         ← or book.txt — original text
-  manifest.json     ← metadata for the LLM (see below)
+
+### 2. Add a new book
+
+```bash
+python scripts/book.py init my-book --epub ~/Downloads/novel.epub
 ```
 
-**Example `manifest.json`:**
+This creates `sources/my-book/` (source + manifest template), extracts a cover if possible, and registers the book in `books/catalog.json`.
+
+Optionally edit `sources/my-book/manifest.json` — add `notes` and `characterNames` to guide the LLM:
 
 ```json
 {
@@ -61,122 +72,85 @@ sources/my-book/
   "author": "Albert Camus",
   "language": "fr",
   "translationLanguage": "en",
-  "year": 1942,
-  "genre": "literary fiction",
   "notes": "First-person, detached tone. Keep 'maman' not 'mother'.",
-  "characterNames": ["Meursault", "Marie"],
-  "translationStyle": "natural literary English"
+  "characterNames": ["Meursault", "Marie"]
+}
 ```
 
-`notes` and `characterNames` help the LLM stay consistent across the whole book.
-
-### 2. Install dependencies
+### 3. Translate + audio (repeat)
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python scripts/book.py continue my-book
 ```
 
-### 3. Set your API key
+Each run translates the next batch (default 30 sentences), generates matching audio, and updates the catalog. Safe to stop and resume anytime.
 
 ```bash
-cp .env.example .env
+python scripts/book.py status my-book   # see progress + next step
 ```
 
-Edit `.env`:
-
-```
-OPENAI_API_KEY=sk-...
-MODEL=gpt-4o-mini
-```
-
-Works with any OpenAI-compatible API (`OPENAI_BASE_URL` optional).
-
-### 4. Translate
+Or with Make:
 
 ```bash
-# Check sentence splitting (free, no API calls)
-python scripts/prepare_book.py sources/my-book/book.epub --dry-run
+make continue BOOK=my-book
+make status BOOK=my-book
+```
 
-# First batch only — translate 30 sentences, then test in the app
-python scripts/prepare_book.py sources/my-book/book.epub --limit 30
+### 4. Read it
 
-# Continue next batch (resumes from saved state)
-python scripts/prepare_book.py sources/my-book/book.epub --from-id 31 --limit 30
+Refresh the app — your book appears in the library with translation progress.
 
-# Translate everything remaining (from id 1, or pick up after batches)
-python scripts/prepare_book.py sources/my-book/book.epub
+### 5. Deploy (if using Lightsail)
 
-# Fix a bad stretch only
+```bash
+python scripts/book.py deploy ubuntu@YOUR_IP --key ./your-key.pem
+```
+
+Or set `LIGHTSAIL_HOST` and `LIGHTSAIL_KEY` in `.env`, then `make deploy`.
+
+---
+
+### Cost estimate
+
+```bash
+python scripts/estimate_cost.py sources/my-book/book.epub
+```
+
+Rough guide with defaults (`gpt-4o-mini`, 15-sentence windows):
+
+| Scope | Sentences | Est. cost |
+|-------|-----------|-----------|
+| Sample book (`books/letranger/`) | 130 | under $0.01 |
+| Full novel (~36,000 words) | ~4,000 | **~$0.10–0.30** |
+| Long novel (~100,000 words) | ~12,000 | **~$0.50–1.50** |
+
+Audio via Edge TTS is free.
+
+---
+
+## Advanced (low-level scripts)
+
+For fine-grained control, use the underlying scripts directly:
+
+```bash
+# Split only (no API calls)
+python scripts/book.py split my-book
+
+# Translate with explicit range
 python scripts/prepare_book.py sources/my-book/book.epub --from-id 40 --to-id 60
-```
 
-| Flag | Meaning |
-|------|---------|
-| `--limit 30` | Translate at most 30 sentences starting at `--from-id` (default 1) |
-| `--from-id 31 --limit 30` | Sentences 31–60 (batch 2) |
-| `--to-id 60` | Translate ids 1–60 inclusive (alternative to `--limit`) |
-| `--dry-run` | Split EPUB/TXT and print sample sentences, no API calls |
+# Re-split after source text changed
+python scripts/prepare_book.py sources/my-book/book.epub --re-split
 
-Output always lands in `books/{folder}/book.json` where `{folder}` is the parent directory of your source file (e.g. `sources/le-petit-prince/book.epub` → `books/le-petit-prince/`). Progress is saved in `sources/{folder}/.prepare_state.json` — safe to stop and resume.
-
-**Estimate cost before translating:**
-
-```bash
-python scripts/estimate_cost.py sources/my-book/book.txt
-```
-
-#### Translation cost (example: *L'Étranger*)
-
-Rough guide with defaults (`gpt-4o-mini`, 15-sentence windows, **5 context sentences**):
-
-| Scope | Sentences | API calls | Est. cost |
-|-------|-----------|-----------|-----------|
-| Your sample in `books/letranger/` | 130 | ~9 | under $0.01 |
-| Full novel (~36,000 French words) | ~4,000 | ~270 | **~$0.10–0.30** |
-| Long novel (~100,000 words) | ~12,000 | ~800 | **~$0.50–1.50** |
-
-`gpt-4o` is roughly 15–20× more. Audio via Edge TTS is free.
-
-### 5. Generate audio
-
-```bash
-# Default: Microsoft Edge neural voices (free, no API key)
-python scripts/generate_audio.py books/my-book/
-
-# OpenAI HD — very natural, uses your existing OPENAI_API_KEY
+# Audio with a specific backend
 python scripts/generate_audio.py books/my-book/ --backend openai --voice onyx
-
-# ElevenLabs — most audiobook-like (needs ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID)
-python scripts/generate_audio.py books/my-book/ --backend elevenlabs
-
-# Pick a French voice (edge backend)
-edge-tts --list-voices | grep fr-FR
-python scripts/generate_audio.py books/my-book/ --backend edge --voice fr-FR-DeniseNeural
 ```
 
-Creates `books/my-book/audio/sentence_1.mp3`, etc. Match your translation batch:
-
-```bash
-# Audio for the first 30 sentences only
-python scripts/generate_audio.py books/my-book/ --to-id 30
-```
-
-#### TTS backends compared
-
-| Backend | Quality | Cost | API key | Best for |
-|---------|---------|------|---------|----------|
-| **edge** (default) | Good neural | Free | None | Personal use, bulk generation |
-| **openai** | Very natural | ~$15 / 1M chars | `OPENAI_API_KEY` | Same key as translation |
-| **elevenlabs** | Best / most expressive | Paid tiers | `ELEVENLABS_API_KEY` | Audiobook feel |
-| **gtts** | Robotic | Free | None | Legacy fallback only |
-
-Set the default in `.env`: `TTS_BACKEND=edge`
-
-### 6. Read it
-
-Refresh the app — your book appears in the library.
+| TTS backend | Quality | Cost | API key |
+|-------------|---------|------|---------|
+| **edge** (default) | Good neural | Free | None |
+| **openai** | Very natural | ~$15 / 1M chars | `OPENAI_API_KEY` |
+| **elevenlabs** | Best / expressive | Paid | `ELEVENLABS_API_KEY` |
 
 ---
 
@@ -192,14 +166,17 @@ books/
     cover.jpg               Optional cover image
 
 scripts/
+  book.py                   Unified CLI (init / continue / status / deploy)
   prepare_book.py           Split text + LLM translate
   generate_audio.py         Text-to-speech (edge / openai / elevenlabs)
   tts_backends.py           TTS provider implementations
   prompts/                  LLM prompt templates
 
-sources/{slug}/             Input for prepare_book.py
-  book.txt
+sources/{slug}/             Input (not deployed)
+  book.epub or book.txt
   manifest.json
+  .sentences.json           Cached sentence splits
+  .prepare_state.json       Translation checkpoint
 
 legacy/                     Old experiments (not used by the app)
 ```
@@ -220,7 +197,7 @@ legacy/                     Old experiments (not used by the app)
 ## Tips
 
 - **iPhone home screen:** Safari → Share → Add to Home Screen (basic PWA support via `web/manifest.json`)
-- **Long books:** translation runs in windows of ~15 sentences; interrupt anytime and re-run the same command to continue
+- **Long books:** run `python scripts/book.py continue <slug>` repeatedly; batch size defaults to 30 (set `BATCH_SIZE` in `.env`)
 - **Tune translation quality:** edit `scripts/prompts/system.txt` or add detail to `manifest.json` → `notes`
 - **Sample book:** `books/letranger/` (*L'Étranger*, 130 sentences) ships ready to read
 

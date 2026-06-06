@@ -366,17 +366,25 @@ Then `sudo nginx -t && sudo systemctl reload nginx`.
 
 ---
 
-### When you add a new book
+### When you add or extend a book
 
 Always on your **Mac**:
 
 ```bash
-python scripts/prepare_book.py sources/new-book/book.txt
-python scripts/generate_audio.py books/new-book/
-./deploy/sync-to-lightsail.sh ubuntu@3.120.45.67
+# New book
+python scripts/book.py init new-book --epub ~/Downloads/novel.epub
+
+# Translate + audio in batches (repeat until status shows "Ready: yes")
+python scripts/book.py continue new-book
+
+# Push to server
+python scripts/book.py deploy ubuntu@3.120.45.67 --key ./your-key.pem
+# or: make deploy  (with LIGHTSAIL_HOST / LIGHTSAIL_KEY in .env)
 ```
 
-Only `books/new-book/` and updated `catalog.json` need to re-sync. Refresh Safari on iPhone — new book appears.
+Only `books/{slug}/` and updated `catalog.json` need to re-sync. Refresh Safari on iPhone — new content appears.
+
+Check progress anytime: `python scripts/book.py status new-book`
 
 ---
 

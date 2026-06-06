@@ -1,6 +1,24 @@
 {
   "books": [
-    "letranger",
-    "le-petit-prince"
+    {
+      "id": "le-petit-prince",
+      "title": "Le Petit Prince",
+      "author": "Antoine de Saint-Exupéry",
+      "cover": "cover.jpg",
+      "totalSentences": 1527,
+      "translatedSentences": 30,
+      "audioSentences": 30,
+      "ready": false
+    },
+    {
+      "id": "l-etranger",
+      "title": "L Etranger",
+      "author": "Albert Camus",
+      "cover": null,
+      "totalSentences": 2125,
+      "translatedSentences": 60,
+      "audioSentences": 60,
+      "ready": false
+    }
   ]
 }

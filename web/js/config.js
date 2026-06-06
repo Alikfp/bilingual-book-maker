@@ -1,4 +1,5 @@
-export const BOOKS_BASE = location.pathname.includes("/web") ? "../books" : "./books";
+// Absolute /books avoids broken relative resolution with hash routes and missing trailing slashes.
+export const BOOKS_BASE = location.pathname.includes("/web") ? "/books" : "./books";
 
 export const MODES = {
   STUDY: "study",

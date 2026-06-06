@@ -1,10 +1,8 @@
 import { MODE_LABELS, MODES } from "./config.js";
 import {
-  fetchBook,
   fetchCatalog,
-  bookStats,
+  catalogStats,
   coverUrl,
-  indexForId,
 } from "./books.js";
 import { getProgress, getLastOpened, getTheme, setTheme, getFontScale, setFontScale } from "./storage.js";
 import { escapeHtml } from "./util.js";
@@ -15,10 +13,14 @@ function progressBar(pct) {
 
 function bookCoverHtml(slug, cover, large = false) {
   const cls = large ? "book-cover book-cover-lg" : "book-cover";
-  if (cover) {
-    return `<img class="${cls}" src="${cover}" alt="">`;
-  }
-  return `<div class="${cls} placeholder" aria-hidden="true">📖</div>`;
+  const src = cover || coverUrl(slug);
+  return `
+    <span class="book-cover-wrap">
+      <img class="${cls}" src="${src}" alt="" loading="lazy"
+        onerror="this.hidden=true; this.nextElementSibling.hidden=false">
+      <div class="${cls} placeholder" hidden aria-hidden="true">📖</div>
+    </span>
+  `;
 }
 
 function readyLabel(stats) {
@@ -52,18 +54,23 @@ export async function renderLibrary(app, { onOpenBook }) {
   const list = app.querySelector("#book-list");
 
   if (catalog.length === 0) {
-    list.innerHTML = '<div class="empty-state">No books yet.<br>Run prepare_book.py to add one.</div>';
+    list.innerHTML = '<div class="empty-state">No books yet.<br>Run <code>python scripts/book.py init</code> to add one.</div>';
     return;
   }
 
-  const entries = await Promise.all(
-    catalog.map(async (slug) => {
-      const book = await fetchBook(slug);
-      const progress = getProgress(slug);
-      const stats = bookStats(book, progress);
-      return { slug, book, progress, stats, cover: coverUrl(slug, book.cover) };
-    })
-  );
+  const entries = catalog.map((entry) => {
+    const slug = entry.slug;
+    const progress = getProgress(slug);
+    const stats = catalogStats(entry, progress);
+    return {
+      slug,
+      entry,
+      progress,
+      stats,
+      cover: coverUrl(slug, entry.cover),
+      incomplete: entry.ready === false,
+    };
+  });
 
   const lastOpened = getLastOpened()?.slug;
   const continueEntry =
@@ -77,8 +84,8 @@ export async function renderLibrary(app, { onOpenBook }) {
         <button type="button" class="continue-inner" data-slug="${escapeHtml(continueEntry.slug)}" data-id="${continueEntry.progress}">
           ${bookCoverHtml(continueEntry.slug, continueEntry.cover, true)}
           <div class="continue-info">
-            <h2>${escapeHtml(continueEntry.book.title)}</h2>
-            <p class="author">${escapeHtml(continueEntry.book.author || "")}</p>
+            <h2>${escapeHtml(continueEntry.entry.title || continueEntry.slug)}</h2>
+            <p class="author">${escapeHtml(continueEntry.entry.author || "")}</p>
             <p class="meta">Sentence ${continueEntry.progress} · ${continueEntry.stats.readPct}% through book</p>
             ${progressBar(continueEntry.stats.readPct)}
             <p class="ready-meta">${readyLabel(continueEntry.stats)}</p>
@@ -90,12 +97,12 @@ export async function renderLibrary(app, { onOpenBook }) {
     : "";
 
   const cards = entries
-    .map(({ slug, book, progress, stats, cover }) => `
-        <button type="button" class="book-card" data-slug="${escapeHtml(slug)}" data-id="${progress}">
+    .map(({ slug, entry, progress, stats, cover, incomplete }) => `
+        <button type="button" class="book-card${incomplete ? " book-card--incomplete" : ""}" data-slug="${escapeHtml(slug)}" data-id="${progress}">
           ${bookCoverHtml(slug, cover)}
           <div class="book-info">
-            <h2>${escapeHtml(book.title)}</h2>
-            <p class="author">${escapeHtml(book.author || "")}</p>
+            <h2>${escapeHtml(entry.title || slug)}${incomplete ? ' <span class="incomplete-badge">In progress</span>' : ""}</h2>
+            <p class="author">${escapeHtml(entry.author || "")}</p>
             <p class="meta">Sentence ${progress} · ${stats.readPct}%</p>
             ${progressBar(stats.partial ? stats.readyPct : stats.readPct)}
             <p class="ready-meta">${readyLabel(stats)}</p>

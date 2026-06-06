@@ -121,6 +121,18 @@
   background: var(--accent-soft);
 }
 
+.book-cover-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 56px;
+  height: 80px;
+}
+
+.continue-inner .book-cover-wrap {
+  width: 72px;
+  height: 104px;
+}
+
 .book-cover {
   width: 56px;
   height: 80px;
@@ -128,6 +140,7 @@
   border-radius: 6px;
   background: var(--border);
   flex-shrink: 0;
+  display: block;
 }
 
 .book-cover-lg {
@@ -141,6 +154,10 @@
   justify-content: center;
   font-size: 1.5rem;
   color: var(--text-muted);
+}
+
+.book-cover.placeholder[hidden] {
+  display: none !important;
 }
 
 .book-info h2,
@@ -186,4 +203,22 @@
   padding: 3rem 1.5rem;
   color: var(--text-muted);
   font-family: var(--font-ui);
+}
+
+.book-card--incomplete {
+  opacity: 0.92;
+}
+
+.incomplete-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  vertical-align: middle;
 }

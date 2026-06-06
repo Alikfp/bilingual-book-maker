@@ -9,23 +9,89 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+import book_common as bc
+
+ROOT = bc.ROOT
 
 # Allow `from tts_backends import ...` when run as scripts/generate_audio.py
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tts_backends import BACKENDS, get_backend  # noqa: E402
 
+load_dotenv = bc.load_dotenv
 
-def load_dotenv() -> None:
-    env_path = ROOT / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+
+def generate_range(
+    book_path: Path,
+    *,
+    from_id: int = 1,
+    to_id: int | None = None,
+    backend_name: str | None = None,
+    voice: str | None = None,
+    force: bool = False,
+) -> dict:
+    """Generate MP3s for a sentence id range. Returns summary dict."""
+    book_path = book_path.resolve()
+    if book_path.is_dir():
+        book_json = book_path / "book.json"
+        book_dir = book_path
+    else:
+        book_json = book_path
+        book_dir = book_path.parent
+
+    if not book_json.exists():
+        raise SystemExit(f"Not found: {book_json}")
+
+    backend_kwargs = {}
+    if voice:
+        backend_kwargs["voice"] = voice
+
+    backend_name = backend_name or os.environ.get("TTS_BACKEND", "edge")
+    backend = get_backend(backend_name, **backend_kwargs)
+    print(f"Backend: {backend.name}")
+
+    book = json.loads(book_json.read_text(encoding="utf-8"))
+    lang = book.get("language", "fr")
+    audio_dir = book_dir / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    sentences = book.get("sentences", [])
+    max_id = max((s["id"] for s in sentences), default=0)
+    to_id = to_id or max_id
+
+    created = skipped = 0
+    first_created = last_created = None
+    for sentence in sentences:
+        sid = sentence["id"]
+        if sid < from_id or sid > to_id:
             continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+        out_file = audio_dir / f"sentence_{sid}.mp3"
+        if out_file.exists() and not force:
+            skipped += 1
+            continue
+
+        text = sentence.get("original", "").strip()
+        if not text:
+            continue
+
+        print(f"  [{sid}/{len(sentences)}] {text[:60]}…", flush=True)
+        backend.synthesize(text, lang, out_file)
+        created += 1
+        first_created = first_created or sid
+        last_created = sid
+
+    print(f"Done: {created} created, {skipped} skipped")
+    slug = book_dir.name
+    bc.update_catalog_entry(slug)
+    return {
+        "slug": slug,
+        "created": created,
+        "skipped": skipped,
+        "from_id": from_id,
+        "to_id": to_id,
+        "first_created": first_created,
+        "last_created": last_created,
+    }
 
 
 def main() -> None:
@@ -61,52 +127,14 @@ Examples:
     parser.add_argument("--to-id", type=int, default=None, dest="to_id")
     args = parser.parse_args()
 
-    book_path = args.book.resolve()
-    if book_path.is_dir():
-        book_json = book_path / "book.json"
-        book_dir = book_path
-    else:
-        book_json = book_path
-        book_dir = book_path.parent
-
-    if not book_json.exists():
-        sys.exit(f"Not found: {book_json}")
-
-    backend_kwargs = {}
-    if args.voice:
-        backend_kwargs["voice"] = args.voice
-
-    backend = get_backend(args.backend, **backend_kwargs)
-    print(f"Backend: {backend.name}")
-
-    book = json.loads(book_json.read_text(encoding="utf-8"))
-    lang = book.get("language", "fr")
-    audio_dir = book_dir / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-
-    sentences = book.get("sentences", [])
-    to_id = args.to_id or max((s["id"] for s in sentences), default=0)
-
-    created = skipped = 0
-    for sentence in sentences:
-        sid = sentence["id"]
-        if sid < args.from_id or sid > to_id:
-            continue
-
-        out_file = audio_dir / f"sentence_{sid}.mp3"
-        if out_file.exists() and not args.force:
-            skipped += 1
-            continue
-
-        text = sentence.get("original", "").strip()
-        if not text:
-            continue
-
-        print(f"  [{sid}/{len(sentences)}] {text[:60]}…", flush=True)
-        backend.synthesize(text, lang, out_file)
-        created += 1
-
-    print(f"Done: {created} created, {skipped} skipped")
+    generate_range(
+        args.book,
+        from_id=args.from_id,
+        to_id=args.to_id,
+        backend_name=args.backend,
+        voice=args.voice,
+        force=args.force,
+    )
 
 
 if __name__ == "__main__":
