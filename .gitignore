@@ -6,10 +6,15 @@ legacy/**
 *.mp3
 *.pdf
 *.docx
+*.epub
 *.jpg
 *.png
 *.DS_Store
 .env
 .venv/
+__pycache__/
+*.py[cod]
+*.pyo
 books/*/audio/
-sources/**/.prepare_state.json
+**/.prepare_state.json
+books/**/manifest.json
