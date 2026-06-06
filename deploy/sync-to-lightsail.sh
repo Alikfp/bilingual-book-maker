@@ -1,38 +1,36 @@
 #!/bin/bash
-# Run on your Mac from the project root.
-# Syncs only what the reader needs to your Lightsail instance.
+# Sync web/ + books/ to Lightsail. Run from project root.
 #
 # Usage:
-#   ./deploy/sync-to-lightsail.sh user@YOUR_STATIC_IP
+#   ./deploy/sync-to-lightsail.sh user@IP path/to/key.pem
 #
-# Example:
-#   ./deploy/sync-to-lightsail.sh ubuntu@3.120.45.67
+# Or for one terminal session only (not saved anywhere):
+#   export LIGHTSAIL_KEY=./LightsailDefaultKey-ap-southeast-2.pem
+#   ./deploy/sync-to-lightsail.sh ubuntu@13.239.132.197
 
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 user@LIGHTSAIL_IP"
-  echo "Example: $0 ubuntu@3.120.45.67"
-  exit 1
-fi
-
-REMOTE="$1"
+REMOTE="${1:?Usage: $0 user@IP [key.pem]}"
+KEY="${2:-${LIGHTSAIL_KEY:-}}"
 REMOTE_DIR="/var/www/bilingual-book-maker"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "Syncing from $ROOT to $REMOTE:$REMOTE_DIR"
+RSYNC=(rsync -avz)
+SSH=(ssh)
+if [ -n "$KEY" ]; then
+  KEY="${KEY/#\~/$HOME}"
+  RSYNC+=(-e "ssh -i $KEY")
+  SSH=(ssh -i "$KEY")
+fi
 
-rsync -avz --delete \
-  "$ROOT/index.html" \
-  "$ROOT/web/" \
-  "$REMOTE:$REMOTE_DIR/web/"
+# /var/www is root-owned; ubuntu needs write access (safe to re-run)
+"${SSH[@]}" "$REMOTE" "sudo mkdir -p '$REMOTE_DIR' && sudo chown -R ubuntu:ubuntu '$REMOTE_DIR'"
 
-rsync -avz \
-  "$ROOT/books/" \
-  "$REMOTE:$REMOTE_DIR/books/"
+echo "Syncing to $REMOTE:$REMOTE_DIR"
 
-rsync -avz \
-  "$ROOT/deploy/" \
-  "$REMOTE:$REMOTE_DIR/deploy/"
+"${RSYNC[@]}" "$ROOT/index.html" "$REMOTE:$REMOTE_DIR/"
+"${RSYNC[@]}" --delete "$ROOT/web/" "$REMOTE:$REMOTE_DIR/web/"
+"${RSYNC[@]}" "$ROOT/books/" "$REMOTE:$REMOTE_DIR/books/"
+"${RSYNC[@]}" "$ROOT/deploy/" "$REMOTE:$REMOTE_DIR/deploy/"
 
-echo "Done. Open http://YOUR_IP/web/ (or https://your-domain/web/)"
+echo "Done. Open http://YOUR_IP/web/"

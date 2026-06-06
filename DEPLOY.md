@@ -268,31 +268,34 @@ chmod +x deploy/sync-to-lightsail.sh
 
 #### Step C2 — Sync files
 
+Pass your `.pem` key as the second argument (nothing is saved to `~/.ssh/config`):
+
 ```bash
-./deploy/sync-to-lightsail.sh ubuntu@3.120.45.67
+chmod 400 LightsailDefaultKey-ap-southeast-2.pem
+./deploy/sync-to-lightsail.sh ubuntu@13.239.132.197 ./LightsailDefaultKey-ap-southeast-2.pem
 ```
 
-If you need your SSH key:
+Or set the key for **this terminal session only**:
 
 ```bash
-rsync -avz -e "ssh -i ~/Downloads/LightsailDefaultKey.pem" \
-  web/ ubuntu@3.120.45.67:/var/www/bilingual-book-maker/web/
-
-rsync -avz -e "ssh -i ~/Downloads/LightsailDefaultKey.pem" \
-  books/ ubuntu@3.120.45.67:/var/www/bilingual-book-maker/books/
-
-rsync -avz -e "ssh -i ~/Downloads/LightsailDefaultKey.pem" \
-  index.html deploy/ ubuntu@3.120.45.67:/var/www/bilingual-book-maker/
+export LIGHTSAIL_KEY=./LightsailDefaultKey-ap-southeast-2.pem
+./deploy/sync-to-lightsail.sh ubuntu@13.239.132.197
 ```
 
 **What this does:** `rsync` copies only changed files over SSH. Uploads:
 
+- `index.html` — redirect to `/web/`
 - `web/` — reader app
 - `books/` — JSON + MP3s (can be large)
-- `index.html` — redirect to `/web/`
 - `deploy/` — nginx config for reference
 
 **Does not upload:** `scripts/`, `sources/`, `.env` (API keys stay on Mac).
+
+If you see `Permission denied` on `/var/www/...`, the script fixes that automatically. Or run once on the server:
+
+```bash
+sudo mkdir -p /var/www/bilingual-book-maker && sudo chown -R ubuntu:ubuntu /var/www/bilingual-book-maker
+```
 
 #### Step C3 — Fix permissions on server (if needed)
 

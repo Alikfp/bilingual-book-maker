@@ -18,3 +18,6 @@ __pycache__/
 books/*/audio/
 **/.prepare_state.json
 books/**/manifest.json
+
+*.pem
+

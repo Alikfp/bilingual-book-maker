@@ -11,6 +11,7 @@ apt-get update
 apt-get install -y nginx
 
 mkdir -p "$SITE_ROOT"
+chown -R ubuntu:ubuntu "$SITE_ROOT"
 
 # Use bundled config if present, else minimal inline config
 if [ -f "$SITE_ROOT/deploy/nginx.conf" ]; then
