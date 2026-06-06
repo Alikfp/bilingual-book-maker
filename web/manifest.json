@@ -1,6 +1,6 @@
 {
   "name": "Bilingual Reader",
-  "short_name": "Reader",
+  "short_name": "Bilingual",
   "description": "Read books sentence by sentence with audio and translations",
   "start_url": "./",
   "display": "standalone",

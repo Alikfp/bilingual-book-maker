@@ -23,7 +23,7 @@ export function normalizeCatalogEntry(entry) {
 }
 
 export async function fetchCatalog() {
-  const res = await fetch(`${BOOKS_BASE}/catalog.json`);
+  const res = await fetch(`${BOOKS_BASE}/catalog.json`, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load book catalog");
   const data = await res.json();
   return (data.books || []).map(normalizeCatalogEntry);

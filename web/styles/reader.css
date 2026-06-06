@@ -2,6 +2,27 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative;
+  isolation: isolate;
+}
+
+.reader-view::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--cover-image, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.09;
+  filter: blur(12px) saturate(0.85);
+  transform: scale(1.08);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.reader-view > * {
+  position: relative;
+  z-index: 1;
 }
 
 .reader-top {
@@ -10,8 +31,16 @@
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
   font-family: var(--font-ui);
+}
+
+.reader-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .back-btn {
@@ -49,7 +78,8 @@
   color: var(--text-muted);
 }
 
-.mode-chip {
+.mode-chip,
+.speed-chip {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.35rem 0.65rem;
@@ -62,8 +92,21 @@
   white-space: nowrap;
 }
 
+.speed-chip {
+  min-width: 2.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+#btn-font {
+  min-width: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .mode-chip.active,
-.mode-chip:active {
+.mode-chip:active,
+.speed-chip:active {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: var(--accent);
@@ -74,7 +117,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   border-bottom: 1px solid var(--border);
 }
 
@@ -94,7 +137,7 @@
   padding: 0.35rem 1rem;
   font-size: 0.72rem;
   text-align: center;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   border-bottom: 1px solid var(--border);
 }
 
@@ -130,6 +173,11 @@
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius);
+  backdrop-filter: blur(6px);
 }
 
 .chapter-label {
@@ -157,16 +205,19 @@
 
 .sentence-translation {
   font-size: var(--text-en);
-  line-height: 1.55;
-  color: var(--text-muted);
+  line-height: 1.65;
+  color: var(--text);
   margin: 0;
-  padding: 1rem;
+  padding: 1rem 1.1rem;
   border-left: 3px solid var(--accent);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent-soft) 75%, transparent);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   user-select: text;
   -webkit-user-select: text;
-  font-family: var(--font-ui);
+  font-family: var(--font-en);
+  font-weight: 400;
+  font-optical-sizing: auto;
+  letter-spacing: 0.01em;
   opacity: 0;
   max-height: 0;
   overflow: hidden;
@@ -179,9 +230,9 @@
 }
 
 .sentence-translation.is-visible {
-  opacity: 1;
+  opacity: 0.92;
   max-height: 40vh;
-  padding: 1rem;
+  padding: 1rem 1.1rem;
 }
 
 .sentence-hint {
@@ -206,7 +257,8 @@
   gap: 0.5rem;
   padding: 0.65rem 1.25rem calc(0.65rem + var(--safe-bottom));
   border-top: 1px solid var(--border);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 .toolbar-btn {

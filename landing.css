@@ -1,0 +1,172 @@
+body.landing {
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+.landing {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 2.5rem 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Layered ambient background */
+.landing::before,
+.landing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing::before {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 100% 100%, color-mix(in srgb, var(--accent-soft) 80%, transparent), transparent 65%),
+    radial-gradient(ellipse 50% 40% at 0% 80%, color-mix(in srgb, var(--border) 55%, transparent), transparent 60%);
+}
+
+.landing::after {
+  opacity: 0.35;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 18%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 20%, transparent 75%);
+}
+
+.landing-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 26rem);
+  padding: 2.25rem 1.75rem 2rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow:
+    0 24px 48px color-mix(in srgb, var(--text) 8%, transparent),
+    0 1px 0 color-mix(in srgb, var(--surface) 60%, transparent) inset;
+  backdrop-filter: blur(14px);
+}
+
+.landing-logo-wrap {
+  width: 5.75rem;
+  height: 5.75rem;
+  margin: 0 auto 1.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.landing-logo {
+  width: 3.25rem;
+  height: 3.25rem;
+  display: block;
+}
+
+.landing h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 5vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.landing-tagline {
+  margin: 0.9rem 0 0;
+  font-family: var(--font-en);
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.landing-features {
+  margin: 1.65rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.landing-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.72rem 0.85rem;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.landing-features span {
+  flex-shrink: 0;
+  width: 1.85rem;
+  height: 1.85rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.landing-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 1.65rem;
+  min-height: 50px;
+  min-width: 12rem;
+  padding: 0.9rem 1.75rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--accent) 32%, transparent),
+    0 1px 0 color-mix(in srgb, white 20%, transparent) inset;
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.landing-cta:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 34px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 1px 0 color-mix(in srgb, white 20%, transparent) inset;
+}
+
+.landing-cta:active {
+  transform: translateY(0);
+}
+
+.landing-foot {
+  margin: 1.15rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-cta {
+    transition: none;
+  }
+}

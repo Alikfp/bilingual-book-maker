@@ -2,6 +2,7 @@ import { MODES, MODE_LABELS } from "./config.js";
 import {
   audioUrl,
   bookStats,
+  coverUrl,
   fetchBook,
   indexForId,
   isSentenceReady,
@@ -9,6 +10,12 @@ import {
 import {
   getReadingMode,
   cycleReadingMode,
+  cycleAudioSpeed,
+  cycleFontScale,
+  formatAudioSpeed,
+  formatFontScale,
+  getAudioSpeed,
+  getFontScale,
   saveProgress,
 } from "./storage.js";
 import { chapterLabel, escapeHtml, prefersReducedMotion } from "./util.js";
@@ -133,6 +140,8 @@ export function createReader(app, audio) {
 
     els.modeBtn.textContent = MODE_LABELS[getReadingMode()];
     els.modeBtn.classList.toggle("active", getReadingMode() !== MODES.STUDY);
+    els.speedBtn.textContent = formatAudioSpeed(getAudioSpeed());
+    els.fontBtn.textContent = formatFontScale(getFontScale());
 
     els.prev.disabled = index <= 0;
     const nextSentence = book.sentences[index + 1];
@@ -224,6 +233,14 @@ export function createReader(app, audio) {
     els.play.addEventListener("mouseleave", cancel);
   }
 
+  function applyCoverBackground() {
+    const cover = coverUrl(book.id, book.cover);
+    const view = app.querySelector(".reader-view");
+    if (view) {
+      view.style.setProperty("--cover-image", cover ? `url("${cover}")` : "none");
+    }
+  }
+
   function mountShell() {
     app.innerHTML = `
       <div class="reader-view mode-${getReadingMode()}">
@@ -233,7 +250,11 @@ export function createReader(app, audio) {
             <h1 id="reader-title"></h1>
             <p id="reader-author"></p>
           </div>
-          <button type="button" class="mode-chip" id="btn-mode"></button>
+          <div class="reader-controls">
+            <button type="button" class="speed-chip" id="btn-font" aria-label="Text size"></button>
+            <button type="button" class="speed-chip" id="btn-speed" aria-label="Audio speed"></button>
+            <button type="button" class="mode-chip" id="btn-mode"></button>
+          </div>
         </header>
         <div class="reader-progress">
           <div class="progress-track"><div class="progress-fill" id="reader-bar"></div></div>
@@ -261,6 +282,8 @@ export function createReader(app, audio) {
     els.barFill = app.querySelector("#reader-bar");
     els.readyMeta = app.querySelector("#reader-ready");
     els.modeBtn = app.querySelector("#btn-mode");
+    els.fontBtn = app.querySelector("#btn-font");
+    els.speedBtn = app.querySelector("#btn-speed");
     els.play = app.querySelector("#btn-play");
     els.playIcon = app.querySelector("#play-icon");
     els.playLabel = app.querySelector("#play-label");
@@ -269,6 +292,8 @@ export function createReader(app, audio) {
 
     app.querySelector("#reader-title").textContent = book.title;
     app.querySelector("#reader-author").textContent = book.author || "";
+    applyCoverBackground();
+    audio.setRate(getAudioSpeed());
 
     app.querySelector("#btn-back").addEventListener("click", () => navigateFn("#/"));
     els.prev.addEventListener("click", () => goRelative(-1));
@@ -283,6 +308,15 @@ export function createReader(app, audio) {
       app.querySelector(".reader-view").className = `reader-view mode-${getReadingMode()}`;
       updateChrome();
       if (shouldAutoPlay()) audio.play();
+    });
+    els.fontBtn.addEventListener("click", () => {
+      els.fontBtn.textContent = formatFontScale(cycleFontScale());
+      updateContent();
+    });
+    els.speedBtn.addEventListener("click", () => {
+      const next = cycleAudioSpeed();
+      audio.setRate(next);
+      els.speedBtn.textContent = formatAudioSpeed(next);
     });
 
     bindSwipe(els.content);
@@ -310,10 +344,12 @@ export function createReader(app, audio) {
         app.querySelector("#reader-title").textContent = book.title;
         app.querySelector("#reader-author").textContent = book.author || "";
         app.querySelector(".reader-view").className = `reader-view mode-${getReadingMode()}`;
+        applyCoverBackground();
       }
 
       index = indexForId(book, sentenceId || 1);
       peeking = false;
+      audio.setRate(getAudioSpeed());
       saveProgress(slug, sentence().id);
       loadAudio();
       updateContent();

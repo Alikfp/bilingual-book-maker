@@ -28,7 +28,7 @@ fi
 
 echo "Syncing to $REMOTE:$REMOTE_DIR"
 
-"${RSYNC[@]}" "$ROOT/index.html" "$REMOTE:$REMOTE_DIR/"
+"${RSYNC[@]}" "$ROOT/index.html" "$ROOT/landing.css" "$REMOTE:$REMOTE_DIR/"
 "${RSYNC[@]}" --delete "$ROOT/web/" "$REMOTE:$REMOTE_DIR/web/"
 "${RSYNC[@]}" "$ROOT/books/" "$REMOTE:$REMOTE_DIR/books/"
 "${RSYNC[@]}" "$ROOT/deploy/" "$REMOTE:$REMOTE_DIR/deploy/"

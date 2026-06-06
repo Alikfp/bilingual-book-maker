@@ -1,11 +1,16 @@
 import { MODES } from "./config.js";
 
+const AUDIO_SPEEDS = [0.75, 1, 1.25, 1.5];
+
+const FONT_STEPS = [-1, 0, 1];
+
 const KEYS = {
   progress: "bilingual-reader-progress",
   lastOpened: "bilingual-reader-last-opened",
   readingMode: "bilingual-reader-mode",
   theme: "bilingual-reader-theme",
   fontScale: "bilingual-reader-font-scale",
+  audioSpeed: "bilingual-reader-audio-speed",
 };
 
 function readJson(key, fallback) {
@@ -71,8 +76,41 @@ export function getFontScale() {
 }
 
 export function setFontScale(step) {
-  localStorage.setItem(KEYS.fontScale, String(step));
-  applyFontScale(step);
+  const clamped = Math.max(-1, Math.min(1, step));
+  localStorage.setItem(KEYS.fontScale, String(clamped));
+  applyFontScale(clamped);
+}
+
+export function cycleFontScale() {
+  const idx = FONT_STEPS.indexOf(getFontScale());
+  const next = FONT_STEPS[(idx + 1) % FONT_STEPS.length];
+  setFontScale(next);
+  return next;
+}
+
+export function formatFontScale(step) {
+  return { [-1]: "S", 0: "M", 1: "L" }[step] || "M";
+}
+
+export function getAudioSpeed() {
+  const raw = parseFloat(localStorage.getItem(KEYS.audioSpeed) || "1");
+  return AUDIO_SPEEDS.includes(raw) ? raw : 1;
+}
+
+export function setAudioSpeed(speed) {
+  if (!AUDIO_SPEEDS.includes(speed)) return;
+  localStorage.setItem(KEYS.audioSpeed, String(speed));
+}
+
+export function cycleAudioSpeed() {
+  const idx = AUDIO_SPEEDS.indexOf(getAudioSpeed());
+  const next = AUDIO_SPEEDS[(idx + 1) % AUDIO_SPEEDS.length];
+  setAudioSpeed(next);
+  return next;
+}
+
+export function formatAudioSpeed(speed) {
+  return speed === 1 ? "1×" : `${speed}×`;
 }
 
 export function applyPreferences() {
@@ -85,6 +123,6 @@ function applyTheme(theme) {
 }
 
 function applyFontScale(step) {
-  const scales = [0.9, 1, 1.12];
+  const scales = [0.88, 1, 1.2];
   document.documentElement.style.setProperty("--font-scale", String(scales[step + 1]));
 }

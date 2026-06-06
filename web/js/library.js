@@ -4,7 +4,7 @@ import {
   catalogStats,
   coverUrl,
 } from "./books.js";
-import { getProgress, getLastOpened, getTheme, setTheme, getFontScale, setFontScale } from "./storage.js";
+import { getProgress, getLastOpened, getTheme, setTheme } from "./storage.js";
 import { escapeHtml } from "./util.js";
 
 function progressBar(pct) {
@@ -34,13 +34,14 @@ export async function renderLibrary(app, { onOpenBook }) {
   app.innerHTML = `
     <header class="library-header">
       <div class="library-header-row">
-        <div>
-          <h1>Bilingual Reader</h1>
-          <p>One sentence at a time</p>
+        <div class="library-brand">
+          <img class="library-logo" src="logo.svg" width="44" height="44" alt="">
+          <div>
+            <h1>Bilingual Reader</h1>
+            <p class="library-tagline">One sentence at a time</p>
+          </div>
         </div>
         <div class="library-actions">
-          <button type="button" class="icon-btn" id="btn-font-down" aria-label="Smaller text">A−</button>
-          <button type="button" class="icon-btn" id="btn-font-up" aria-label="Larger text">A+</button>
           <button type="button" class="icon-btn" id="btn-theme" aria-label="Toggle theme">◐</button>
         </div>
       </div>
@@ -121,13 +122,6 @@ export async function renderLibrary(app, { onOpenBook }) {
 }
 
 function bindLibrarySettings(app) {
-  app.querySelector("#btn-font-down")?.addEventListener("click", () => {
-    setFontScale(Math.max(-1, getFontScale() - 1));
-  });
-  app.querySelector("#btn-font-up")?.addEventListener("click", () => {
-    setFontScale(Math.min(1, getFontScale() + 1));
-  });
-
   app.querySelector("#btn-theme")?.addEventListener("click", () => {
     const order = ["auto", "light", "dark"];
     const current = getTheme();

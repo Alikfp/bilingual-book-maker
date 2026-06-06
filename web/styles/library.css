@@ -9,6 +9,21 @@
   gap: 1rem;
 }
 
+.library-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.library-logo {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .library-header h1 {
   margin: 0;
   font-size: 1.5rem;
@@ -16,7 +31,7 @@
   font-family: var(--font-ui);
 }
 
-.library-header p {
+.library-tagline {
   margin: 0.35rem 0 0;
   color: var(--text-muted);
   font-size: 0.95rem;

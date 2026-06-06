@@ -22,6 +22,10 @@ FR_ABBREV = re.compile(
     re.IGNORECASE,
 )
 
+# OCR / scan artifacts and other non-prose lines the LLM often skips.
+PAGE_MARKER = re.compile(r"Page\s+\d+\s*$", re.IGNORECASE)
+CHAPTER_NUMBER = re.compile(r"^\d+\.\s*$")
+
 load_dotenv = bc.load_dotenv
 
 
@@ -220,6 +224,36 @@ def call_llm(system: str, user: str, model: str, base_url: str, api_key: str) ->
     raise SystemExit(f"Unexpected LLM response shape: {content[:200]}")
 
 
+def auto_translation(original: str) -> str | None:
+    """Return a pass-through translation for non-prose lines, or None."""
+    text = original.strip()
+    if not text:
+        return None
+    if PAGE_MARKER.search(text) or CHAPTER_NUMBER.fullmatch(text):
+        return text
+    return None
+
+
+def fill_auto_translations(
+    sentences: list[dict],
+    missing_ids: set[int],
+    into: dict[int, str],
+) -> set[int]:
+    by_id = {s["id"]: s for s in sentences}
+    still_missing: set[int] = set()
+    for sid in missing_ids:
+        sentence = by_id.get(sid)
+        if sentence is None:
+            still_missing.add(sid)
+            continue
+        auto = auto_translation(sentence["original"])
+        if auto is not None:
+            into[sid] = auto
+        else:
+            still_missing.add(sid)
+    return still_missing
+
+
 def translate_window(
     manifest: dict,
     sentences: list[dict],
@@ -232,6 +266,7 @@ def translate_window(
     api_key: str,
     context_before: int,
     context_after: int,
+    _allow_retry: bool = True,
 ) -> dict[int, str]:
     system = format_system_prompt(manifest)
     user_template = load_template("user_window.txt")
@@ -264,9 +299,36 @@ def translate_window(
     if expected_ids != got_ids:
         missing = expected_ids - got_ids
         extra = got_ids - expected_ids
-        raise SystemExit(
-            f"Translation ID mismatch. Missing: {sorted(missing)}. Extra: {sorted(extra)}"
-        )
+        if extra:
+            raise SystemExit(
+                f"Translation ID mismatch. Missing: {sorted(missing)}. Extra: {sorted(extra)}"
+            )
+        missing = fill_auto_translations(sentences, missing, new_translations)
+        if missing and _allow_retry:
+            retry_indices = [
+                i for i in range(start_idx, end_idx) if sentences[i]["id"] in missing
+            ]
+            print(
+                f"  Retrying missing ids {sorted(missing)} …",
+                flush=True,
+            )
+            return translate_window(
+                manifest,
+                sentences,
+                min(retry_indices),
+                max(retry_indices) + 1,
+                translations | new_translations,
+                model=model,
+                base_url=base_url,
+                api_key=api_key,
+                context_before=context_before,
+                context_after=context_after,
+                _allow_retry=False,
+            )
+        if missing:
+            raise SystemExit(
+                f"Translation ID mismatch. Missing: {sorted(missing)}. Extra: []"
+            )
     translations.update(new_translations)
     return translations
 

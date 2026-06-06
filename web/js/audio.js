@@ -1,10 +1,16 @@
 export function createAudioController(player) {
   let state = "idle";
+  let rate = 1;
   let listeners = new Set();
 
   function setState(next) {
     state = next;
     listeners.forEach((fn) => fn(state));
+  }
+
+  function applyRate() {
+    player.playbackRate = rate;
+    player.defaultPlaybackRate = rate;
   }
 
   function bind() {
@@ -23,9 +29,18 @@ export function createAudioController(player) {
       return state;
     },
 
+    get rate() {
+      return rate;
+    },
+
     onChange(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
+    },
+
+    setRate(next) {
+      rate = next;
+      applyRate();
     },
 
     load(url) {
@@ -38,9 +53,11 @@ export function createAudioController(player) {
         player.src = url;
         player.load();
       }
+      applyRate();
     },
 
     play() {
+      applyRate();
       return player.play().catch(() => setState("error"));
     },
 

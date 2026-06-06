@@ -19,6 +19,16 @@
       "translatedSentences": 60,
       "audioSentences": 60,
       "ready": false
+    },
+    {
+      "id": "le-petit-nicolas",
+      "title": "Le Petit Nicolas",
+      "author": "",
+      "cover": null,
+      "totalSentences": 1290,
+      "translatedSentences": 75,
+      "audioSentences": 60,
+      "ready": false
     }
   ]
 }
