@@ -29,6 +29,16 @@
       "translatedSentences": 75,
       "audioSentences": 60,
       "ready": false
+    },
+    {
+      "id": "the-little-prince",
+      "title": "The Little Prince",
+      "author": "Antoine de Saint-Exupéry",
+      "cover": null,
+      "totalSentences": 1599,
+      "translatedSentences": 76,
+      "audioSentences": 75,
+      "ready": false
     }
   ]
 }
