@@ -20,6 +20,21 @@ import {
 } from "./storage.js";
 import { chapterLabel, escapeHtml, prefersReducedMotion } from "./util.js";
 
+const TRANSLATION_LABELS = {
+  en: "English",
+  farsi: "Farsi",
+  fa: "Farsi",
+  fr: "French",
+  de: "German",
+  es: "Spanish",
+  it: "Italian",
+  pt: "Portuguese",
+};
+
+function translationLabel(lang) {
+  return TRANSLATION_LABELS[lang] || lang || "translation";
+}
+
 export function createReader(app, audio) {
   let book = null;
   let index = 0;
@@ -63,7 +78,8 @@ export function createReader(app, audio) {
       return `<p class="sentence-hint">Audio not available.</p>`;
     }
     if (getReadingMode() === MODES.STUDY && !peeking) {
-      return `<p class="sentence-hint study-hint">Tap sentence to peek at English</p>`;
+      const label = translationLabel(book?.translationLanguage);
+      return `<p class="sentence-hint study-hint">Tap sentence to peek at ${escapeHtml(label)}</p>`;
     }
     return "";
   }

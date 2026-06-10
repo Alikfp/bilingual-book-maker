@@ -141,19 +141,37 @@ def load_template(name: str) -> str:
     return (PROMPTS_DIR / name).read_text(encoding="utf-8")
 
 
+def default_translation_style(translation_language: str) -> str:
+    styles = {
+        "en": "natural literary English",
+        "farsi": "natural literary Persian (Farsi)",
+        "fa": "natural literary Persian (Farsi)",
+        "fr": "natural literary French",
+        "de": "natural literary German",
+        "es": "natural literary Spanish",
+        "it": "natural literary Italian",
+        "pt": "natural literary Portuguese",
+    }
+    key = (translation_language or "").lower()
+    return styles.get(key, f"natural literary {translation_language}")
+
+
 def format_system_prompt(manifest: dict) -> str:
     template = load_template("system.txt")
     characters = manifest.get("characterNames") or []
     if isinstance(characters, list):
         characters = ", ".join(characters)
+    target = manifest.get("translationLanguage", "")
     return template.format(
         title=manifest.get("title", ""),
         author=manifest.get("author", "Unknown"),
         language=manifest.get("language", ""),
-        translationLanguage=manifest.get("translationLanguage", ""),
+        translationLanguage=target,
         year=manifest.get("year", "unknown"),
         genre=manifest.get("genre", "literary fiction"),
-        translationStyle=manifest.get("translationStyle", "natural literary English"),
+        translationStyle=manifest.get(
+            "translationStyle", default_translation_style(target)
+        ),
         notes=manifest.get("notes", "none"),
         characterNames=characters or "none",
     )

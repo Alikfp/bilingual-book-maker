@@ -6,5 +6,5 @@ Previously translated (for terminology consistency):
 
 {sentenceBlock}
 
-Return JSON: {{"translations": [{{"id": <number>, "translation": "<english>"}}, ...]}}
-Include one entry per [TRANSLATE] sentence only.
+Return JSON: {{"translations": [{{"id": <number>, "translation": "<text in target language>"}}, ...]}}
+Include one entry per [TRANSLATE] sentence only. Write each translation in the target language from the system prompt.
